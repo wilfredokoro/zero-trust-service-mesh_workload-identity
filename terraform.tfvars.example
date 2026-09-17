@@ -1,0 +1,8 @@
+aws_region         = "us-east-1"
+cluster_name       = "gavok-zt"
+kubernetes_version = "1.34"
+vpc_cidr           = "10.60.0.0/16"
+azs                = ["us-east-1a", "us-east-1b"]
+
+on_demand_instance_types = ["m6i.large"]
+spot_instance_types      = ["m6i.large", "m5.large", "m5a.large"]
