@@ -5,7 +5,7 @@
 # older DynamoDB lock table.
 terraform {
   backend "s3" {
-    bucket       = "REPLACE-ME-gavok-zt-tfstate"
+    bucket       = "gavok-zt-tfstate"
     key          = "gavok-zt-foundation/terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true

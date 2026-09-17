@@ -100,11 +100,13 @@ here in case they resurface:
   nodes still won't join, check that the VPC endpoint security group
   allows 443 inbound from the node subnets — that's the other half of
   what bit fred01.
-- **`terraform plan` complains about an unknown argument in `eks.tf`.**
-  This targets v21.24 of `terraform-aws-modules/eks/aws`, same as fred01.
-  If an argument name doesn't match, diff `eks.tf` against fred01's
-  working config rather than guessing from scratch — that migration is
-  already solved once.
+- **`terraform plan` / `terraform init` complains about an unknown argument in `eks.tf`.**
+  Already hit and fixed once: v21 removed `eks_managed_node_group_defaults`
+  entirely (confirmed against the module's own v21 upgrade guide) — shared
+  node-group settings now go directly into each node group, which is why
+  `eks.tf` uses a `local.node_group_defaults` + `merge()` instead. If a
+  *different* argument trips this, diff against fred01's working config
+  before troubleshooting from scratch.
 - **Stale `.terraform` cache** after any module version change:
   `rm -rf .terraform .terraform.lock.hcl` and re-run `terraform init`.
 - **ECR pulls fail once workloads land.** Confirm the `ecr.api` /

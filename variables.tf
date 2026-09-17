@@ -36,13 +36,13 @@ variable "azs" {
 variable "on_demand_instance_types" {
   description = "Instance types for the 'gavok' on-demand node group (istiod, spire-server land here)"
   type        = list(string)
-  default     = ["m6i.large"]
+  default     = ["t2.large"]
 }
 
 variable "spot_instance_types" {
   description = "Instance types for the 'kwok' spot node group (everything else)"
   type        = list(string)
-  default     = ["m6i.large", "m5.large", "m5a.large"]
+  default     = ["t2.large", "t2.large", "t2.large"]
 }
 
 variable "mirrored_images" {

@@ -1,11 +1,27 @@
-# NOTE ON MODULE VERSION: v21 of this module renamed several cluster_*
-# arguments (cluster_name -> name, cluster_version -> kubernetes_version,
+# NOTE ON MODULE VERSION: v21 renamed several cluster_* arguments
+# (cluster_name -> name, cluster_version -> kubernetes_version,
 # cluster_encryption_config -> encryption_config, among others) and
 # replaced the aws-auth ConfigMap with access_entries. You already fought
-# through this exact migration on fred01 -- if `terraform plan` rejects an
-# argument below, diff this file against fred01's working eks.tf before
-# troubleshooting from scratch; that's faster than re-deriving the v21 API
-# surface from the registry docs.
+# through this exact migration on fred01.
+#
+# eks_managed_node_group_defaults was removed outright in v21 -- there is
+# no more shared-defaults block. Settings go directly into each node
+# group now, so the local below + merge() below stands in for it.
+
+locals {
+  node_group_defaults = {
+    ami_type = "AL2023_x86_64_STANDARD"
+
+    # v21 also quietly changed the IMDS hop-limit default from 2 back
+    # down to 1, which reopens the exact node-join issue from fred01.
+    # Same fix, just applied per-node-group instead of via a shared
+    # defaults block.
+    metadata_options = {
+      http_tokens                 = "required"
+      http_put_response_hop_limit = 2
+    }
+  }
+}
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
@@ -24,39 +40,40 @@ module "eks" {
 
   encryption_config = {
     provider_key_arn = aws_kms_key.eks.arn
-    resources         = ["secrets"]
+    resources        = ["secrets"]
   }
 
-  eks_managed_node_group_defaults = {
-    ami_type = "AL2023_x86_64_STANDARD"
-
-    # Every node hit the IMDSv2 hop-limit issue on fred01 (default hop
-    # limit of 1 breaks in-pod metadata calls). Baked the fix in here.
-    metadata_options = {
-      http_tokens                 = "required"
-      http_put_response_hop_limit = 2
-    }
+  # v21 disabled the old automatic "bootstrap_self_managed_addons" path
+  # entirely -- without this block, node groups come up with no CNI and
+  # nodes never go Ready. These pull from AWS's own per-region EKS addon
+  # ECR repos, not docker.io/ghcr.io, so they're already reachable through
+  # the ecr.api/ecr.dkr endpoints in vpc.tf -- no extra mirroring needed,
+  # unlike Istio/SPIRE later.
+  addons = {
+    vpc-cni    = {}
+    coredns    = {}
+    kube-proxy = {}
   }
 
   eks_managed_node_groups = {
     # On-demand: control-plane-adjacent workloads (istiod, spire-server
     # later) that shouldn't get reclaimed mid-demo.
-    gavok = {
+    gavok = merge(local.node_group_defaults, {
       instance_types = var.on_demand_instance_types
       capacity_type  = "ON_DEMAND"
       min_size       = 2
       max_size       = 4
       desired_size   = 2
-    }
+    })
     # Spot: everything else (ztunnel DaemonSet runs on both groups by
     # design; demo workloads land here).
-    kwok = {
+    kwok = merge(local.node_group_defaults, {
       instance_types = var.spot_instance_types
       capacity_type  = "SPOT"
       min_size       = 0
       max_size       = 4
       desired_size   = 1
-    }
+    })
   }
 
   # Explicit cluster -> node 443 rule (kubelet / webhook traffic). This was
