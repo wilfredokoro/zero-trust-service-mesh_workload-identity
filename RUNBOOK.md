@@ -94,6 +94,15 @@ kubectl get nodes -o wide
 Issues already hit once on fred01 — pre-empted in this config, flagged
 here in case they resurface:
 
+- **Nodes join but stay `NotReady`, or node groups fail with
+  `CREATE_FAILED: ... Unhealthy nodes`.** This module creates addons
+  *after* node groups by default (addons depend on the node group modules
+  completing) — backwards for `vpc-cni` specifically, since nodes need
+  CNI to go Ready before the node group's own health check will pass.
+  Left unfixed it deadlocks: node group waits on CNI, CNI waits on node
+  group, the node group's health-check timeout wins first. Fixed in
+  `eks.tf` with `before_compute = true` on `vpc-cni`, which flips that
+  dependency.
 - **Node join failures.** IMDSv2 hop limit is set to 2 in `eks.tf`
   (`eks_managed_node_group_defaults.metadata_options`), and the cluster→
   node 443 rule is explicit in `node_security_group_additional_rules`. If

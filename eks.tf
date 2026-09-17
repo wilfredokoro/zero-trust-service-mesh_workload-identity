@@ -49,8 +49,18 @@ module "eks" {
   # ECR repos, not docker.io/ghcr.io, so they're already reachable through
   # the ecr.api/ecr.dkr endpoints in vpc.tf -- no extra mirroring needed,
   # unlike Istio/SPIRE later.
+  #
+  # before_compute = true on vpc-cni specifically: by default this module
+  # creates addons AFTER node groups (addons depend on the node group
+  # modules completing). Backwards for vpc-cni, which nodes need in order
+  # to go Ready in the first place -- without this flag it deadlocks: node
+  # groups wait on CNI to make nodes Ready, CNI waits on node groups to
+  # finish, node group health-check timeout wins and the whole thing fails
+  # CREATE_FAILED. This flips vpc-cni to create before the node groups.
   addons = {
-    vpc-cni    = {}
+    vpc-cni = {
+      before_compute = true
+    }
     coredns    = {}
     kube-proxy = {}
   }
@@ -61,9 +71,9 @@ module "eks" {
     gavok = merge(local.node_group_defaults, {
       instance_types = var.on_demand_instance_types
       capacity_type  = "ON_DEMAND"
-      min_size       = 2
+      min_size       = 1
       max_size       = 4
-      desired_size   = 2
+      desired_size   = 1
     })
     # Spot: everything else (ztunnel DaemonSet runs on both groups by
     # design; demo workloads land here).
